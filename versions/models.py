@@ -16,6 +16,7 @@ import copy
 import datetime
 from django.core.exceptions import SuspiciousOperation, MultipleObjectsReturned, ObjectDoesNotExist
 from django.db.models.constants import LOOKUP_SEP
+from django.conf import settings
 
 from django.db.models import Q
 from django.db.models.fields import FieldDoesNotExist
@@ -30,6 +31,8 @@ from django.utils import six
 import uuid
 
 from django.db import models, router
+
+from model_utils import FieldTracker
 
 
 def get_utc_now():
@@ -845,9 +848,9 @@ class Versionable(models.Model):
         # id allowing us to get at all historic foreign key relationships
         earlier_version.id = six.u(str(uuid.uuid4()))
         earlier_version.version_end_date = forced_version_date
-        earlier_version.save()
+        earlier_version.save(create_new_version=False)
 
-        later_version.save()
+        later_version.save(create_new_version=False)
 
         # re-create ManyToMany relations
         for field in earlier_version._meta.many_to_many:
@@ -857,7 +860,7 @@ class Versionable(models.Model):
             for rel in earlier_version._meta.many_to_many_related:
                 earlier_version.clone_relations(later_version, rel.via_field_name)
 
-        later_version.save()
+        later_version.save(create_new_version=False)
 
         return later_version
 
@@ -900,6 +903,31 @@ class Versionable(models.Model):
             # On rel, set the source ID to self.id
             setattr(rel, source.source_field_name, self)
             rel.save()
+
+    def save(self, create_new_version=None, *args, **kwargs):
+        """
+        This method saves changes made to the model to the database. By default, it just calls the save method
+        of the Django model class. However, if either create_new_version or the SAVE_CREATES_VERSION setting
+        is True, this will not change this model, but save any changes made to it to a new version.
+        """
+        if create_new_version is None:
+            try:
+                create_new_version = settings.SAVE_CREATES_VERSION
+            except AttributeError:
+                create_new_version = False
+
+        if not self.pk:
+            create_new_version = False
+
+        if create_new_version:
+            new_version = self.__class__.objects.get(pk=self.pk).clone()
+            for field in self.__class__._meta.local_fields:
+                field_name = field.attname
+                if field_name not in ['id', 'identity'] + ['version_' + d + '_date' for d in ['start', 'end', 'birth']]:
+                    setattr(new_version, field_name, getattr(self, field_name))
+            super(Versionable, new_version).save()
+        else:
+            super(Versionable, self).save(*args, **kwargs)
 
 
 class VersionedManyToManyModel(object):
