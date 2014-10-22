@@ -920,7 +920,12 @@ class Versionable(models.Model):
             create_new_version = False
 
         if create_new_version:
-            new_version = self.__class__.objects.get(pk=self.pk).clone()
+            try:
+                new_version = self.__class__.objects.get(pk=self.pk).clone()
+            except ObjectDoesNotExist:
+                super(Versionable, self).save(*args, **kwargs)
+                return
+
             for field in self.__class__._meta.local_fields:
                 field_name = field.attname
                 if field_name not in ['id', 'identity'] + ['version_' + d + '_date' for d in ['start', 'end', 'birth']]:
