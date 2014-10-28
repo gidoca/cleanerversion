@@ -34,8 +34,6 @@ import uuid
 
 from django.db import models, router
 
-from model_utils import FieldTracker
-
 
 def get_utc_now():
     return datetime.datetime.utcnow().replace(tzinfo=utc)
