@@ -617,6 +617,24 @@ class CreationTest(TestCase):
         except ValidationError:
             self.fail("Full clean did not succeed")
 
+    def test_save_new_version(self):
+        b = B.objects.create(name='someB')
+        b.name = 'someOtherB'
+        b.save(create_new_version=True)
+        b_new = B.objects.get(version_end_date__isnull=True)
+        b_old = B.objects.get(version_end_date__isnull=False)
+        self.assertEqual(b_old.name, 'someB')
+        self.assertEqual(b_new.name, 'someOtherB')
+        self.assertEqual(b_old.identity, b_new.identity)
+        self.assertNotEqual(b_old.id, b_new.id)
+
+    def test_save_no_new_version(self):
+        b = B.objects.create(name='someB')
+        b.name = 'someOtherB'
+        b.save(create_new_version=False)
+        self.assertEqual(B.objects.count(), 1)
+        self.assertEqual(B.objects.get().name, 'someOtherB')
+
 
 class DeletionTest(TestCase):
     def setUp(self):
