@@ -16,8 +16,9 @@ import datetime
 from time import sleep
 import itertools
 from django.core.exceptions import SuspiciousOperation, ObjectDoesNotExist, MultipleObjectsReturned, ValidationError
+from django.db import IntegrityError
 from django.db.models import Q
-from django.db.models.fields import CharField
+from django.db.models.fields import CharField, IntegerField
 from django.test import TestCase, TransactionTestCase
 from django.utils.timezone import utc
 from django.utils import six
@@ -617,6 +618,8 @@ class CreationTest(TestCase):
         except ValidationError:
             self.fail("Full clean did not succeed")
 
+
+class SaveTest(TestCase):
     def test_save_new_version(self):
         b = B.objects.create(name='someB')
         b.name = 'someOtherB'
@@ -634,6 +637,22 @@ class CreationTest(TestCase):
         b.save(create_new_version=False)
         self.assertEqual(B.objects.count(), 1)
         self.assertEqual(B.objects.get().name, 'someOtherB')
+
+
+
+class Num(Versionable):
+    num = IntegerField()
+
+class SaveTransactionTest(TransactionTestCase):
+    def test_save_transaction(self):
+        b = Num.objects.create(num=42)
+
+        b.num = None
+
+        self.assertRaises(IntegrityError, lambda: b.save(create_new_version=True))
+        self.assertEqual(Num.objects.count(), 1)
+        self.assertEqual(Num.objects.get().num, 42)
+
 
 
 class DeletionTest(TestCase):

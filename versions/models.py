@@ -16,6 +16,7 @@ import copy
 import datetime
 from django import VERSION
 from django.core.exceptions import SuspiciousOperation, MultipleObjectsReturned, ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.base import Model
 from django.db.models.constants import LOOKUP_SEP
 from django.conf import settings
@@ -996,16 +997,18 @@ class Versionable(models.Model):
 
         if create_new_version:
             try:
-                new_version = self.__class__.objects.get(pk=self.pk).clone()
+                new_version = self.__class__.objects.get(pk=self.pk)
             except ObjectDoesNotExist:
                 super(Versionable, self).save(*args, **kwargs)
                 return
 
-            for field in self.__class__._meta.local_fields:
-                field_name = field.attname
-                if field_name not in ['id', 'identity'] + ['version_' + d + '_date' for d in ['start', 'end', 'birth']]:
-                    setattr(new_version, field_name, getattr(self, field_name))
-            super(Versionable, new_version).save()
+            with transaction.atomic():
+                new_version = new_version.clone()
+                for field in self.__class__._meta.local_fields:
+                    field_name = field.attname
+                    if field_name not in ['id', 'identity'] + ['version_' + d + '_date' for d in ['start', 'end', 'birth']]:
+                        setattr(new_version, field_name, getattr(self, field_name))
+                super(Versionable, new_version).save()
         else:
             super(Versionable, self).save(*args, **kwargs)
 
