@@ -115,7 +115,7 @@ class VersionManager(models.Manager):
 
     @property
     def current(self):
-        return self.filter(version_end_date__isnull=True)
+        return self.get_queryset().current
 
     def create(self, **kwargs):
         """
@@ -410,6 +410,10 @@ class VersionedQuerySet(QuerySet):
         """
         qs = super(VersionedQuerySet, self).values_list(*fields, **kwargs)
         return qs.add_as_of_filter(qs.query_time)
+
+    @property
+    def current(self):
+        return self.filter(version_end_date__isnull=True)
 
 
 class VersionedForeignKey(ForeignKey):
