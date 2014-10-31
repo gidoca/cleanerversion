@@ -64,10 +64,15 @@ some entries::
     p.save()
     t2 = datetime.utcnow().replace(tzinfo=utc)
 
-    p = p.clone()
     p.phone = '987654'
-    p.save()
+    p.save(create_new_version=True)
     t3 = datetime.utcnow().replace(tzinfo=utc)
+
+As we can see, there are to ways two create a new revision. One is to clone the current entry, update it and call
+save. The other is to pass ``create_new_version=True`` to the save method (or to set ``SAVE_CREATES_VERSION = True``
+in your settings file). The advantage of this latter method is that all changes are wrapped in a trasaction. This
+means that if the save fails, no changes will be made to the database. The disadvantage is that after the save, the
+object will be in an invalid state and should no longer be used. 
 
 Now, let's query the entries::
 
